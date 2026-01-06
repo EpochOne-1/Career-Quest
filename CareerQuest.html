@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project: NEURAL DRIFT // Full Assessment</title>
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-red: #ff0055;
+            --neon-green: #00ff66;
+            --bg-color: #050505;
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+            user-select: none;
+        }
+        canvas { display: block; }
+        
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 20px; right: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .hud-box {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            padding: 10px;
+            margin-bottom: 5px;
+            color: var(--neon-blue);
+            font-size: 0.9rem;
+        }
+
+        /* Center Modal (Intro/Outro/Dialogue) */
+        #modal-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+        }
+        .modal-content {
+            max-width: 600px;
+            padding: 40px;
+            border: 2px solid var(--neon-blue);
+            background: #111;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+        }
+        h1 { margin: 0 0 20px 0; color: var(--neon-blue); }
+        h2 { color: white; margin-bottom: 15px; }
+        p { color: #ccc; line-height: 1.6; margin-bottom: 20px; }
+        
+        button {
+            background: transparent;
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: 0.2s;
+            margin: 5px;
+        }
+        button:hover { background: var(--neon-blue); color: black; }
+        
+        .super-btn { border-color: #ffd700; color: #ffd700; }
+        .super-btn:hover { background: #ffd700; color: black; }
+
+        /* Superpower Indicator */
+        #power-active {
+            position: absolute;
+            top: 20px; right: 20px;
+            color: #ffd700;
+            font-weight: bold;
+            display: none;
+            text-shadow: 0 0 10px #ffd700;
+            z-index: 10;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="hud-box">STAGE: <span id="stage-txt">1/5</span></div>
+        <div class="hud-box">PROFILE: <span id="profile-txt">CALIBRATING</span></div>
+    </div>
+
+    <div id="power-active">SUPERPOWER READY (PRESS 'SPACE')</div>
+
+    <div id="modal-overlay">
+        <div class="modal-content" id="modal-inner">
+            <h1>PROJECT: NEURAL DRIFT</h1>
+            <p>Welcome, Candidate.</p>
+            <p>You will undergo 5 simulations. We measure your instincts, not your knowledge.</p>
+            <p>Look for "Glitches" to unlock cheat skills.</p>
+            <button onclick="GameManager.startLevel(1)">BEGIN SEQUENCE</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // --- GLOBAL CONFIG ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- GAME MANAGER (State Machine) ---
+        const GameManager = {
+            currentLevel: 0,
+            hasSuperpower: false,
+            stats: {
+                analytical: 0,
+                creative: 0,
+                social: 0,
+                resilient: 0,
+                risk: 0
+            },
+            
+            // Level Loader
+            startLevel: function(levelIndex) {
+                this.currentLevel = levelIndex;
+                document.getElementById('modal-overlay').style.display = 'none';
+                document.getElementById('stage-txt').innerText = `${levelIndex}/5`;
+                
+                // Reset Canvas
+                ctx.clearRect(0,0, canvas.width, canvas.height);
+                
+                // Route to Game Logic
+                if (levelIndex === 1) Game1.init();
+                else if (levelIndex === 2) Game2.init();
+                else if (levelIndex === 3) Game3.init();
+                else if (levelIndex === 4) Game4.init();
+                else if (levelIndex === 5) Game5.init();
+                else this.showFinalResults();
+
+                if (this.hasSuperpower) {
+                    document.getElementById('power-active').style.display = 'block';
+                } else {
+                    document.getElementById('power-active').style.display = 'none';
+                }
+            },
+
+            // Inter-level Modal
+            levelComplete: function(msg) {
+                document.getElementById('modal-overlay').style.display = 'flex';
+                let html = `<h2>SIMULATION ${this.currentLevel} COMPLETE</h2><p>${msg}</p>`;
+                
+                // 20% Chance to find a "Glitch" (Superpower)
+                if (Math.random() < 0.25 && !this.hasSuperpower) {
+                    html += `<p style="color:#ffd700">⚠ SYSTEM GLITCH FOUND: You obtained a CHEAT KEY.</p>`;
+                    this.hasSuperpower = true;
+                }
+
+                html += `<button onclick="GameManager.startLevel(${this.currentLevel + 1})">INITIATE NEXT PROTOCOL</button>`;
+                document.getElementById('modal-inner').innerHTML = html;
+            },
+
+            showFinalResults: function() {
+                document.getElementById('modal-overlay').style.display = 'flex';
+                
+                // Determine Career
+                let topTrait = Object.keys(this.stats).reduce((a, b) => this.stats[a] > this.stats[b] ? a : b);
+                let career = "";
+                
+                if (topTrait === 'analytical') career = "Data Scientist / Systems Architect";
+                if (topTrait === 'creative') career = "UX Designer / Game Director";
+                if (topTrait === 'social') career = "HR Director / Psychologist";
+                if (topTrait === 'resilient') career = "Emergency Medicine / Crisis Manager";
+                if (topTrait === 'risk') career = "Venture Capitalist / Entrepreneur";
+
+                let html = `
+                    <h1 style="color:#00ff66">ASSESSMENT COMPLETE</h1>
+                    <p>Your Neural Profile indicates:</p>
+                    <h2 style="font-size:2rem; color:var(--neon-blue)">${topTrait.toUpperCase()}</h2>
+                    <p>Suggested Career Path: <strong>${career}</strong></p>
+                    <hr style="border-color:#333; width:50%; margin: 20px auto;">
+                    <button onclick="location.reload()">RESET SYSTEM</button>
+                `;
+                document.getElementById('modal-inner').innerHTML = html;
+            },
+            
+            useSuperpower: function() {
+                if (this.hasSuperpower) {
+                    this.hasSuperpower = false; // Consumed
+                    document.getElementById('power-active').style.display = 'none';
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        // --- INPUT HANDLING ---
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            if (e.code === 'Space') handleSpacebar();
+        });
+        window.addEventListener('keyup', e => keys[e.key] = false);
+
+        function handleSpacebar() {
+            if (GameManager.currentLevel === 1) Game1.interact();
+            if (GameManager.currentLevel === 2 && GameManager.hasSuperpower) Game2.activateCheat();
+            if (GameManager.currentLevel === 4) Game4.jump();
+        }
+
+
+        // ==========================================
+        // GAME 1: THE EXPLORER (RPG - Top Down)
+        // Tests: Social vs Analytical
+        // ==========================================
+        const Game1 = {
+            player: { x: 100, y: 100, size: 20, speed: 4 },
+            npcs: [
+                {x: 400, y: 300, w: 40, h: 40, color: '#ff0055', type: 'social', active: true},
+                {x: 600, y: 150, w: 40, h: 40, color: '#00f3ff', type: 'analytical', active: true}
+            ],
+            loopId: null,
+
+            init: function() {
+                this.player.x = 100;
+                this.loop();
+            },
+
+            loop: function() {
+                if (GameManager.currentLevel !== 1) return;
+                
+                // Clear
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Instructions
+                ctx.fillStyle = '#666';
+                ctx.font = "20px Courier New";
+                ctx.fillText("WASD to Move. Approach targets. SPACE to interact.", 50, 50);
+
+                // Move Player
+                if (keys['w']) this.player.y -= this.player.speed;
+                if (keys['s']) this.player.y += this.player.speed;
+                if (keys['a']) this.player.x -= this.player.speed;
+                if (keys['d']) this.player.x += this.player.speed;
+
+                // Draw NPCs
+                this.npcs.forEach(npc => {
+                    if (npc.active) {
+                        ctx.fillStyle = npc.color;
+                        ctx.fillRect(npc.x, npc.y, npc.w, npc.h);
+                        // Label
+                        ctx.fillStyle = '#fff';
+                        ctx.font = "12px Courier";
+                        ctx.fillText(npc.type === 'social' ? 'Stranger' : 'Terminal', npc.x, npc.y - 10);
+                    }
+                });
+
+                // Draw Player
+                ctx.fillStyle = 'white';
+                ctx.fillRect(this.player.x, this.player.y, this.player.size, this.player.size);
+
+                requestAnimationFrame(() => this.loop());
+            },
+
+            interact: function() {
+                // Simple distance check
+                let hit = false;
+                this.npcs.forEach(npc => {
+                    let dx = this.player.x - npc.x;
+                    let dy = this.player.y - npc.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < 60 && npc.active) {
+                        npc.active = false;
+                        hit = true;
+                        if (npc.type === 'social') {
+                            GameManager.stats.social += 5;
+                            GameManager.levelComplete("You chose to help the Stranger (Empathy).");
+                        } else {
+                            GameManager.stats.analytical += 5;
+                            GameManager.levelComplete("You chose to analyze the Terminal (Logic).");
+                        }
+                    }
+                });
+            }
+        };
+
+
+        // ==========================================
+        // GAME 2: THE MEMORY GRID (Pattern)
+        // Tests: Analytical / Focus
+        // ==========================================
+        const Game2 = {
+            grid: [],
+            cols: 4, rows: 4,
+            pattern: [],
+            showingPattern: true,
+            
+            init: function() {
+                this.grid = [];
+                this.pattern = [];
+                // Create Grid
+                for(let i=0; i<this.cols*this.rows; i++) {
+                    this.grid.push({id: i, x:0, y:0, active: false});
+                }
+                // Generate Pattern
+                for(let i=0; i<5; i++) {
+                    this.pattern.push(Math.floor(Math.random() * 16));
+                }
+                
+                setTimeout(() => { this.showingPattern = false; }, 2000); // 2s memory time
+                this.draw();
+                
+                // Click Listener
+                canvas.onclick = (e) => this.handleClick(e);
+            },
+
+            activateCheat: function() {
+                if (GameManager.useSuperpower()) {
+                    this.showingPattern = true; // Reveal pattern again
+                    setTimeout(() => { this.showingPattern = false; this.draw(); }, 2000);
+                    this.draw();
+                }
+            },
+
+            draw: function() {
+                if (GameManager.currentLevel !== 2) return;
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = "20px Courier New";
+                ctx.fillText("Memorize the blue tiles. Click them after they vanish.", 50, 50);
+                if (GameManager.hasSuperpower) ctx.fillText("Press SPACE to use Cheat (Reveal)", 50, 80);
+
+                let size = 80;
+                let gap = 10;
+                let startX = canvas.width/2 - ((size+gap)*this.cols)/2;
+                let startY = canvas.height/2 - ((size+gap)*this.rows)/2;
+
+                this.grid.forEach((cell, i) => {
+                    let r = Math.floor(i / this.cols);
+                    let c = i % this.cols;
+                    cell.x = startX + c * (size + gap);
+                    cell.y = startY + r * (size + gap);
+                    cell.w = size;
+
+                    ctx.fillStyle = '#222';
+                    // Show pattern if mode is active
+                    if (this.showingPattern && this.pattern.includes(i)) ctx.fillStyle = '#00f3ff';
+                    // Show player clicks
+                    if (cell.active) ctx.fillStyle = '#00ff66';
+
+                    ctx.fillRect(cell.x, cell.y, size, size);
+                });
+            },
+
+            handleClick: function(e) {
+                if (GameManager.currentLevel !== 2 || this.showingPattern) return;
+                
+                let rect = canvas.getBoundingClientRect();
+                let mx = e.clientX - rect.left;
+                let my = e.clientY - rect.top;
+
+                this.grid.forEach((cell, index) => {
+                    if (mx > cell.x && mx < cell.x + cell.w && my > cell.y && my < cell.y + cell.w) {
+                        cell.active = true;
+                        this.draw();
+                        // Check Win
+                        let clickedIndices = this.grid.map((c, i) => c.active ? i : -1).filter(i => i !== -1);
+                        if (clickedIndices.length === this.pattern.length) {
+                             GameManager.stats.analytical += 5;
+                             canvas.onclick = null; // Remove listener
+                             GameManager.levelComplete("Pattern Matched. High focus detected.");
+                        }
+                    }
+                });
+            }
+        };
+
+        // ==========================================
+        // GAME 3: THE INVESTOR (Slider/Risk)
+        // Tests: Risk vs Security
+        // ==========================================
+        const Game3 = {
+            balance: 1000,
+            market: [],
+            tick: 0,
+            invested: false,
+
+            init: function() {
+                this.balance = 1000;
+                this.market = [50];
+                this.tick = 0;
+                this.invested = false;
+                this.loop();
+            },
+
+            loop: function() {
+                if (GameManager.currentLevel !== 3) return;
+                
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                this.tick++;
+                
+                // Market fluctuation logic
+                let last = this.market[this.market.length-1];
+                let change = (Math.random() - 0.48) * 5; // Slight upward trend
+                let price = Math.max(10, last + change);
+                if (this.tick % 5 === 0) this.market.push(price);
+                if (this.market.length > 200) this.market.shift();
+
+                // Draw Graph
+                ctx.strokeStyle = '#00f3ff';
+                ctx.beginPath();
+                this.market.forEach((val, i) => {
+                    ctx.lineTo(i * 5 + 100, canvas.height/2 + 100 - val);
+                });
+                ctx.stroke();
+
+                // UI
+                ctx.fillStyle = 'white';
+                ctx.font = "20px Courier New";
+                ctx.fillText(`Bank: $${Math.floor(this.balance)}`, 100, 100);
+                
+                // Buttons (Simulated by click zones for simplicity)
+                ctx.fillStyle = '#333';
+                ctx.fillRect(100, 400, 150, 50);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(this.invested ? "SELL ALL" : "INVEST ALL", 120, 430);
+
+                if (this.invested) {
+                    this.balance = (this.balance / last) * price;
+                }
+
+                // End condition
+                if (this.tick > 500) {
+                    canvas.onclick = null;
+                    if (this.balance > 1200) {
+                         GameManager.stats.risk += 5;
+                         GameManager.levelComplete("Profit Secured. High risk tolerance.");
+                    } else {
+                         GameManager.stats.resilient += 3;
+                         GameManager.levelComplete("Stable Growth. Caution detected.");
+                    }
+                    return;
+                }
+
+                // Click to toggle invest
+                canvas.onclick = (e) => {
+                    let rect = canvas.getBoundingClientRect();
+                    let mx = e.clientX - rect.left;
+                    let my = e.clientY - rect.top;
+                    if (mx > 100 && mx < 250 && my > 400 && my < 450) {
+                        this.invested = !this.invested;
+                    }
+                };
+
+                requestAnimationFrame(() => this.loop());
+            }
+        };
+
+        // ==========================================
+        // GAME 4: NEON RUNNER (Reflex)
+        // Tests: Resilience / Reaction
+        // ==========================================
+        const Game4 = {
+            playerY: 0,
+            velocity: 0,
+            ground: 400,
+            obstacles: [],
+            score: 0,
+            
+            init: function() {
+                this.playerY = this.ground;
+                this.obstacles = [];
+                this.score = 0;
+                this.loop();
+            },
+            
+            jump: function() {
+                if (this.playerY >= this.ground) this.velocity = -12;
+            },
+
+            loop: function() {
+                if (GameManager.currentLevel !== 4) return;
+                
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Physics
+                this.velocity += 0.6; // Gravity
+                this.playerY += this.velocity;
+                if (this.playerY > this.ground) {
+                    this.playerY = this.ground;
+                    this.velocity = 0;
+                }
+
+                // Obstacles
+                if (Math.random() < 0.02) {
+                    this.obstacles.push({x: canvas.width, w: 30, h: 40});
+                }
+
+                // Draw Player
+                ctx.fillStyle = '#ff0055';
+                ctx.fillRect(100, this.playerY - 40, 40, 40);
+
+                // Draw/Move Obstacles
+                ctx.fillStyle = '#fff';
+                this.obstacles.forEach((obs, i) => {
+                    obs.x -= 6;
+                    ctx.fillRect(obs.x, this.ground - obs.h, obs.w, obs.h);
+                    
+                    // Collision
+                    if (obs.x < 140 && obs.x + obs.w > 100 && this.playerY > this.ground - obs.h) {
+                         GameManager.stats.resilient -= 1; // Penalty
+                    }
+                });
+
+                ctx.fillStyle = 'white';
+                ctx.font = "20px Courier New";
+                ctx.fillText("SPACE to Jump. Survive.", 50, 50);
+
+                this.score++;
+                if (this.score > 500) {
+                    GameManager.stats.resilient += 5;
+                    GameManager.levelComplete("Course cleared. High reflexes.");
+                } else {
+                    requestAnimationFrame(() => this.loop());
+                }
+            }
+        };
+
+        // ==========================================
+        // GAME 5: THE JUDGE (Decision/Text)
+        // Tests: Creative / Ethics
+        // ==========================================
+        const Game5 = {
+            init: function() {
+                // This is a simple visual novel style ending
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                this.drawUI();
+            },
+
+            drawUI: function() {
+                // We use DOM for this one for easier text handling
+                let overlay = document.getElementById('modal-overlay');
+                overlay.style.display = 'flex';
+                
+                let html = `
+                    <h2>FINAL SCENARIO</h2>
+                    <p>You find an AI that has become sentient. It begs you not to delete it, but company protocol says it is a virus.</p>
+                    <button onclick="Game5.resolve('creative')">Re-write its code to make it safe (Creative)</button>
+                    <button onclick="Game5.resolve('analytical')">Delete it. Rules are rules. (Analytical)</button>
+                    <button onclick="Game5.resolve('social')">Talk to it and learn from it. (Social)</button>
+                `;
+                
+                if (GameManager.hasSuperpower) {
+                    html += `<br><button class="super-btn" onclick="Game5.resolve('cheat')">CHEAT: MERGE WITH AI (God Mode)</button>`;
+                }
+
+                document.getElementById('modal-inner').innerHTML = html;
+            },
+
+            resolve: function(trait) {
+                if (trait !== 'cheat') GameManager.stats[trait] += 10;
+                else {
+                    GameManager.stats.risk += 10;
+                    GameManager.stats.creative += 10;
+                }
+                GameManager.showFinalResults();
+            }
+        };
+
+    </script>
+</body>
+</html>
